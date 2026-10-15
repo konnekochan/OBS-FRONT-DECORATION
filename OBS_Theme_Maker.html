@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OBSテーマ作成ツール</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #edf4f7; color: #173744; font-family: "Segoe UI", "Meiryo", sans-serif; }
+        header { padding: 24px 32px; background: #fff; border-bottom: 1px solid #d4e4ec; }
+        h1 { margin: 0 0 8px; font-size: 24px; }
+        p { line-height: 1.7; margin: 8px 0; }
+        main { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 24px; padding: 24px; max-width: 1500px; margin: auto; }
+        aside, .card { padding: 22px; background: #fff; border: 1px solid #d7e5eb; border-radius: 16px; }
+        h2 { font-size: 17px; margin: 0 0 16px; }
+        label.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0; }
+        input[type="text"], select { width: 160px; padding: 8px; border: 1px solid #b5cbd5; border-radius: 6px; background: #fff; color: #173744; }
+        input[type="color"] { width: 48px; height: 32px; border: 0; padding: 0; background: transparent; }
+        .color-value { font-family: monospace; font-size: 12px; }
+        .range { margin: 16px 0; }
+        .range label { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        input[type="range"] { width: 100%; accent-color: #168cab; }
+        button { cursor: pointer; border: 1px solid #b5cbd5; background: #eef6f9; color: #173744; padding: 11px 14px; border-radius: 8px; font: inherit; }
+        button:hover { background: #dceff5; }
+        .actions { display: grid; gap: 8px; margin-top: 20px; }
+        button.primary { background: #126e88; color: #fff; border-color: #126e88; }
+        .right { display: grid; align-content: start; gap: 18px; min-width: 0; }
+        .hint { font-size: 13px; color: #516c79; }
+        #status { min-height: 24px; color: #136781; margin-top: 12px; }
+        #preview { background: var(--background); color: var(--text); border-radius: 12px; padding: 16px; font-size: 13px; overflow: hidden; }
+        .obs-title { font-weight: bold; margin-bottom: 14px; }
+        .menu { margin-bottom: 14px; opacity: .85; line-height: 1.8; }
+        .screen { height: 245px; background: #070a0e; display: grid; place-items: center; color: #7f9aa6; border: 1px solid #354954; }
+        .screen span { text-align: center; letter-spacing: 2px; }
+        .docks { display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 10px; margin: 16px 0; }
+        .dock { background-color: var(--panel); background-image: var(--textureImage); border: var(--borderWidth) solid var(--border); border-radius: var(--radius); overflow: hidden; min-height: 180px; }
+        .dock-title { padding: 10px; font-weight: bold; background: var(--button); }
+        .item { padding: 10px; margin: 3px; border-radius: var(--radius); }
+        .item.selected { background: var(--accent); }
+        .item:hover { background: var(--hover); }
+        .meter { height: 9px; margin: 9px 0; background: #132119; border-radius: 2px; overflow: hidden; }
+        .meter i { display: block; width: 70%; height: 100%; background: linear-gradient(90deg, #39bc72 0 65%, #efcc4d 65% 85%, #d05c55 85%); }
+        .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        #preview button { background: var(--button); color: var(--text); border: var(--borderWidth) solid var(--border); border-radius: var(--radius); font-size: 13px; }
+        #preview button.stream { background: var(--accent); }
+        #preview button.record { background: var(--record); }
+        #preview button:hover { background: var(--hover); }
+        #preview button:active { background: var(--accent); }
+        .obs-status { margin-top: 16px; opacity: .8; }
+        ol { padding-left: 22px; line-height: 1.9; }
+        code { background: #edf4f7; padding: 2px 4px; border-radius: 3px; }
+        @media (max-width: 950px) {
+            main { grid-template-columns: 1fr; padding: 12px; }
+            .screen { height: 190px; }
+            .docks { grid-template-columns: 1fr; }
+            .dock { min-height: 120px; }
+            .controls { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>OBSテーマ作成ツール</h1>
+        <p>ガラス・木目・ネオン。好みの色でOBSを着せ替え。</p>
+        <div class="hint">インストール不要 / オフライン動作 / OBS 30.2以降・Yami用</div>
+    </header>
+    <main>
+        <aside>
+            <h2>デザインを編集</h2>
+            <label class="row">テンプレート <select id="preset"></select></label>
+            <label class="row">テーマ名 <input id="name" type="text" maxlength="60"></label>
+            <div id="colors"></div>
+            <label class="row">素材表現
+                <select id="material">
+                    <option value="glass">ガラス風の光沢</option>
+                    <option value="wood">木目</option>
+                    <option value="neon">ネオン・走査線</option>
+                    <option value="flat">単色</option>
+                </select>
+            </label>
+            <div class="range"><label for="radius">角丸 <output id="radiusValue"></output></label><input id="radius" type="range" min="0" max="24"></div>
+            <div class="range"><label for="borderWidth">枠線 <output id="borderWidthValue"></output></label><input id="borderWidth" type="range" min="0" max="5"></div>
+            <div class="range"><label for="texture">素材の強さ <output id="textureValue"></output></label><input id="texture" type="range" min="0" max="100"></div>
+            <div class="actions">
+                <button id="exportTheme" class="primary">OBS用テーマZIPを保存</button>
+                <button id="saveSettings">編集設定を保存</button>
+                <button id="loadSettings">編集設定を読み込む</button>
+                <button id="reset">選択中のテンプレートに戻す</button>
+            </div>
+            <input id="settingsFile" type="file" accept=".json,application/json" hidden>
+            <p id="status" role="status" aria-live="polite"></p>
+        </aside>
+        <section class="right">
+            <div class="card">
+                <h2>OBS風プレビュー</h2>
+                <p class="hint">ボタンにマウスを乗せるとホバー色を確認できます。実際のOBSの描画とは異なります。</p>
+                <div id="preview">
+                    <div class="obs-title">OBS Studio · Theme Preview</div>
+                    <div class="menu">ファイル　編集　表示　ドック　プロファイル　ツール　ヘルプ</div>
+                    <div class="screen"><span>PREVIEW<br><small>配信映像の見た目は変わりません</small></span></div>
+                    <div class="docks">
+                        <div class="dock"><div class="dock-title">シーン</div><div class="item selected">雑談</div><div class="item">ゲーム配信</div><div class="item">歌枠</div></div>
+                        <div class="dock"><div class="dock-title">ソース</div><div class="item">マイク</div><div class="item">ゲームキャプチャ</div><div class="item">立ち絵</div></div>
+                        <div class="dock"><div class="dock-title">音声ミキサー</div><div class="item">マイク<div class="meter"><i></i></div><small>−12.0 dB</small></div><div class="item">デスクトップ音声<div class="meter"><i style="width:45%"></i></div></div></div>
+                    </div>
+                    <div class="controls"><button class="stream" type="button">配信開始</button><button class="record" type="button">録画開始</button><button type="button">設定</button><button type="button">終了</button></div>
+                    <div class="obs-status">LIVE 00:00:00　 REC 00:00:00　 60 fps</div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>OBSへの導入方法</h2>
+                <ol>
+                    <li>「OBS用テーマZIPを保存」を押し、ZIPを解凍します。</li>
+                    <li>OBSの「ファイル → 設定フォルダを表示」を開き、OBSを閉じます。</li>
+                    <li>解凍した<code>themes</code>フォルダを設定フォルダへコピーします。既存のthemesがあれば中身を追加します。</li>
+                    <li>OBSを再起動し、「設定 → 外観」でテーマを<strong>Yami</strong>にして、スタイルから作成した名前を選択します。</li>
+                </ol>
+                <p class="hint">元に戻すには元のスタイルを選択してください。ガラスは光沢、ネオンは明るい枠線による表現です。背景ぼかし・本物の発光ぼかしは含みません。</p>
+            </div>
+        </section>
+    </main>
+    <script>
+        "use strict";
+        // 01. Presets and the editable OBS theme template.
+        const PRESETS = [
+    {
+        "preset": "水色ガラス",
+        "name": "Aqua Glass",
+        "background": "#122C3B",
+        "panel": "#254A60",
+        "button": "#34677F",
+        "hover": "#49899F",
+        "accent": "#258BA8",
+        "text": "#EEFBFF",
+        "border": "#7BDDF3",
+        "record": "#8C4166",
+        "radius": 8,
+        "borderWidth": 1,
+        "texture": 35,
+        "material": "glass"
+    },
+    {
+        "preset": "木目・まな板",
+        "name": "Wood Board",
+        "background": "#322316",
+        "panel": "#705237",
+        "button": "#826041",
+        "hover": "#99704A",
+        "accent": "#4B7354",
+        "text": "#FFF4DB",
+        "border": "#C69C63",
+        "record": "#854842",
+        "radius": 8,
+        "borderWidth": 1,
+        "texture": 35,
+        "material": "wood"
+    },
+    {
+        "preset": "電光ネオン",
+        "name": "Cyber Neon",
+        "background": "#080C17",
+        "panel": "#10182A",
+        "button": "#162640",
+        "hover": "#293653",
+        "accent": "#066D80",
+        "text": "#DCFBFF",
+        "border": "#12DBED",
+        "record": "#8D286D",
+        "radius": 8,
+        "borderWidth": 1,
+        "texture": 35,
+        "material": "neon"
+    },
+    {
+        "preset": "桜ガラス",
+        "name": "Sakura Glass",
+        "background": "#352331",
+        "panel": "#573C50",
+        "button": "#76506C",
+        "hover": "#915C7B",
+        "accent": "#A74779",
+        "text": "#FFF4FA",
+        "border": "#EBA8CC",
+        "record": "#9D4E57",
+        "radius": 8,
+        "borderWidth": 1,
+        "texture": 35,
+        "material": "glass"
+    },
+    {
+        "preset": "モノクロ",
+        "name": "Monochrome",
+        "background": "#181818",
+        "panel": "#272727",
+        "button": "#393939",
+        "hover": "#4D4D4D",
+        "accent": "#565656",
+        "text": "#F4F4F4",
+        "border": "#858585",
+        "record": "#654040",
+        "radius": 8,
+        "borderWidth": 1,
+        "texture": 35,
+        "material": "flat"
+    },
+    {
+        "preset": "パステル",
+        "name": "Pastel",
+        "background": "#E7E9F2",
+        "panel": "#F4F1FC",
+        "button": "#DDD7ED",
+        "hover": "#CDC1E5",
+        "accent": "#B5AED5",
+        "text": "#25243A",
+        "border": "#8E86AE",
+        "record": "#E7B6C4",
+        "radius": 8,
+        "borderWidth": 1,
+        "texture": 35,
+        "material": "flat"
+    },
+    {
+        "preset": "レトロ端末",
+        "name": "Retro Terminal",
+        "background": "#07180C",
+        "panel": "#102918",
+        "button": "#143A22",
+        "hover": "#235331",
+        "accent": "#20653B",
+        "text": "#A8FFB6",
+        "border": "#44BD68",
+        "record": "#65472B",
+        "radius": 8,
+        "borderWidth": 1,
+        "texture": 35,
+        "material": "neon"
+    },
+    {
+        "preset": "和風・藍",
+        "name": "Japanese Indigo",
+        "background": "#101E2D",
+        "panel": "#23394A",
+        "button": "#2F4C61",
+        "hover": "#426479",
+        "accent": "#346F83",
+        "text": "#F4EFE1",
+        "border": "#B5A37B",
+        "record": "#8E4D48",
+        "radius": 8,
+        "borderWidth": 1,
+        "texture": 35,
+        "material": "wood"
+    }
+];
+        const OBS_TEMPLATE = `@OBSThemeMeta {
+    name: "{{name}}";
+    id: "{{id}}";
+    extends: "com.obsproject.Yami";
+    author: "OBS Theme Maker user";
+    dark: "{{dark}}";
+}
+
+@OBSThemeVars {
+    --maker_background: {{background}};
+    --maker_panel: {{panel}};
+    --maker_button: {{button}};
+    --maker_hover: {{hover}};
+    --maker_accent: {{accent}};
+    --maker_text: {{text}};
+    --maker_border: {{border}};
+    --maker_record: {{record}};
+}
+
+/* 01. Main window and text */
+QWidget {
+    color: var(--maker_text);
+}
+
+QMainWindow,
+QDialog,
+QWidget#centralwidget {
+    background-color: var(--maker_background);
+}
+
+/* 02. Docks and editable lists */
+QDockWidget,
+QDockWidget > QWidget,
+QListWidget,
+QTreeWidget,
+QTreeView,
+QListView,
+QTextEdit,
+QPlainTextEdit {
+    background-color: var(--maker_panel);
+    background-image: {{image}};
+    border: {{borderWidth}}px solid var(--maker_border);
+    border-radius: {{radius}}px;
+    color: var(--maker_text);
+}
+
+QDockWidget::title {
+    background-color: var(--maker_button);
+    color: var(--maker_text);
+    padding: 6px;
+}
+
+QListView::item:selected,
+QTreeView::item:selected {
+    background-color: var(--maker_accent);
+    color: var(--maker_text);
+}
+
+/* 03. Buttons and interaction states */
+QPushButton,
+QToolButton,
+QComboBox {
+    background-color: var(--maker_button);
+    color: var(--maker_text);
+    border: {{borderWidth}}px solid var(--maker_border);
+    border-radius: {{radius}}px;
+    padding: 6px;
+}
+
+QPushButton:hover,
+QToolButton:hover,
+QComboBox:hover {
+    background-color: var(--maker_hover);
+}
+
+QPushButton:pressed,
+QPushButton:checked,
+QToolButton:checked {
+    background-color: var(--maker_accent);
+}
+
+QPushButton:disabled,
+QToolButton:disabled {
+    color: #808080;
+}
+
+QPushButton#streamButton {
+    background-color: var(--maker_accent);
+}
+
+QPushButton#recordButton {
+    background-color: var(--maker_record);
+}
+
+QPushButton#streamButton:hover,
+QPushButton#recordButton:hover {
+    background-color: var(--maker_hover);
+}
+
+/* 04. Input fields */
+QLineEdit,
+QSpinBox,
+QDoubleSpinBox {
+    background-color: var(--maker_panel);
+    color: var(--maker_text);
+    border: {{borderWidth}}px solid var(--maker_border);
+    border-radius: {{radius}}px;
+    padding: 4px;
+}
+
+QLineEdit:focus,
+QSpinBox:focus {
+    border-color: var(--maker_accent);
+}
+
+/* 05. Tabs, menus, tooltips */
+QTabWidget::pane,
+QTabBar::tab,
+QMenu,
+QMenuBar,
+QStatusBar {
+    background-color: var(--maker_panel);
+    color: var(--maker_text);
+}
+
+QTabBar::tab:selected,
+QMenu::item:selected,
+QMenuBar::item:selected {
+    background-color: var(--maker_accent);
+    color: var(--maker_text);
+}
+
+QToolTip {
+    background-color: var(--maker_panel);
+    color: var(--maker_text);
+    border: 1px solid var(--maker_border);
+    padding: 6px;
+}
+
+/* 06. Slider handles and progress */
+QSlider::handle:horizontal,
+QSlider::handle:vertical {
+    background-color: var(--maker_accent);
+    border: 1px solid var(--maker_border);
+}
+
+QProgressBar::chunk {
+    background-color: var(--maker_accent);
+}
+
+/* Keep Yami's checkbox icons, mixer meters and scrollbar geometry. */
+`;
+        const COLOR_LABELS = {
+            background: "全体の背景",
+            panel: "パネル",
+            button: "通常ボタン",
+            hover: "ホバー",
+            accent: "選択・配信",
+            text: "文字",
+            border: "枠線",
+            record: "録画ボタン"
+        };
+        const RANGE_LIMITS = { radius: 24, borderWidth: 5, texture: 100 };
+        let settings = { ...PRESETS[0] };
+        const get = id => document.getElementById(id);
+
+        // 02. Validate imported settings before applying any values.
+        function validateSettings(value) {
+            if (!value || typeof value !== "object" || Array.isArray(value)) {
+                throw new Error("編集設定の形式が正しくありません。");
+            }
+            const clean = {};
+            if (typeof value.name !== "string" || !value.name.trim() || value.name.length > 60 || /[\x00-\x1f]/.test(value.name)) {
+                throw new Error("テーマ名は1〜60文字で入力してください。");
+            }
+            clean.name = value.name.trim();
+            clean.preset = typeof value.preset === "string" ? value.preset : "Custom";
+            for (const key of Object.keys(COLOR_LABELS)) {
+                if (typeof value[key] !== "string" || !/^#[0-9a-f]{6}$/i.test(value[key])) {
+                    throw new Error(`${COLOR_LABELS[key]}の色が不正です。`);
+                }
+                clean[key] = value[key];
+            }
+            for (const [key, max] of Object.entries(RANGE_LIMITS)) {
+                if (!Number.isInteger(value[key]) || value[key] < 0 || value[key] > max) {
+                    throw new Error(`${key}の数値が範囲外です。`);
+                }
+                clean[key] = value[key];
+            }
+            if (!["glass", "wood", "neon", "flat"].includes(value.material)) {
+                throw new Error("素材表現の指定が不正です。");
+            }
+            clean.material = value.material;
+            return clean;
+        }
+
+        // 03. Original procedural textures: no external images or network access.
+        function makeTexture(s) {
+            const canvas = document.createElement("canvas");
+            canvas.width = canvas.height = 256;
+            const context = canvas.getContext("2d");
+            const image = context.createImageData(256, 256);
+            const base = s.panel.match(/[0-9a-f]{2}/gi).map(v => parseInt(v, 16));
+            const strength = s.texture / 100;
+            for (let y = 0; y < 256; y++) {
+                for (let x = 0; x < 256; x++) {
+                    let delta = 0;
+                    if (s.material === "wood") {
+                        delta = (Math.sin(y * .38 + Math.sin(x * .024) * 2) * 19 + Math.sin(x * 17 + y * 13) * 3) * strength;
+                    } else if (s.material === "glass") {
+                        delta = (25 * (1 - y / 255) + (y < 4 ? 20 : 0)) * strength;
+                    } else if (s.material === "neon") {
+                        delta = (y % 4 === 0 ? -16 : 0) * strength;
+                    }
+                    const index = (y * 256 + x) * 4;
+                    for (let c = 0; c < 3; c++) image.data[index + c] = Math.max(0, Math.min(255, base[c] + delta));
+                    image.data[index + 3] = 255;
+                }
+            }
+            context.putImageData(image, 0, 0);
+            return canvas;
+        }
+
+        function renderPreview() {
+            const preview = get("preview");
+            for (const key of Object.keys(COLOR_LABELS)) {
+                preview.style.setProperty(`--${key}`, settings[key]);
+                get(`${key}Value`).textContent = settings[key].toUpperCase();
+            }
+            for (const key of Object.keys(RANGE_LIMITS)) {
+                get(`${key}Value`).textContent = settings[key] + (key === "texture" ? "%" : "px");
+                preview.style.setProperty(`--${key}`, `${settings[key]}px`);
+            }
+            const image = settings.material === "flat" ? "none" : `url(${makeTexture(settings).toDataURL("image/png")})`;
+            preview.style.setProperty("--textureImage", image);
+        }
+
+        function applySettings(value) {
+            settings = validateSettings(value);
+            for (const key of [...Object.keys(COLOR_LABELS), ...Object.keys(RANGE_LIMITS), "name", "material"]) {
+                get(key).value = settings[key];
+            }
+            renderPreview();
+        }
+
+        // 04. ZIP writer (STORE method, CRC32, UTF-8 filenames).
+        // Written for this tool; no third-party ZIP library is loaded.
+        const encoder = new TextEncoder();
+        function crc32(bytes) {
+            let crc = 0xffffffff;
+            for (const byte of bytes) {
+                crc ^= byte;
+                for (let bit = 0; bit < 8; bit++) {
+                    crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+                }
+            }
+            return (crc ^ 0xffffffff) >>> 0;
+        }
+
+        function zipFiles(files) {
+            const parts = [];
+            const central = [];
+            let offset = 0;
+            let centralSize = 0;
+            for (const file of files) {
+                const filename = encoder.encode(file.name);
+                const data = typeof file.data === "string" ? encoder.encode(file.data) : file.data;
+                const checksum = crc32(data);
+                const local = new Uint8Array(30 + filename.length);
+                const l = new DataView(local.buffer);
+                l.setUint32(0, 0x04034b50, true);
+                l.setUint16(4, 20, true);
+                l.setUint16(6, 0x800, true);
+                l.setUint16(12, 33, true); // 1980-01-01
+                l.setUint32(14, checksum, true);
+                l.setUint32(18, data.length, true);
+                l.setUint32(22, data.length, true);
+                l.setUint16(26, filename.length, true);
+                local.set(filename, 30);
+                parts.push(local, data);
+                const directory = new Uint8Array(46 + filename.length);
+                const d = new DataView(directory.buffer);
+                d.setUint32(0, 0x02014b50, true);
+                d.setUint16(4, 20, true);
+                d.setUint16(6, 20, true);
+                d.setUint16(8, 0x800, true);
+                d.setUint16(14, 33, true);
+                d.setUint32(16, checksum, true);
+                d.setUint32(20, data.length, true);
+                d.setUint32(24, data.length, true);
+                d.setUint16(28, filename.length, true);
+                d.setUint32(42, offset, true);
+                directory.set(filename, 46);
+                central.push(directory);
+                offset += local.length + data.length;
+                centralSize += directory.length;
+            }
+            const end = new Uint8Array(22);
+            const e = new DataView(end.buffer);
+            e.setUint32(0, 0x06054b50, true);
+            e.setUint16(8, files.length, true);
+            e.setUint16(10, files.length, true);
+            e.setUint32(12, centralSize, true);
+            e.setUint32(16, offset, true);
+            return new Blob([...parts, ...central, end], { type: "application/zip" });
+        }
+
+        function download(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = filename;
+            document.body.append(link);
+            link.click();
+            link.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 30000);
+        }
+
+        // 05. Generate a Yami variant and its assets.
+        function themeId(name) {
+            // Stable identifier for the same UTF-8 name; independent of file paths.
+            let hash = 0xcbf29ce484222325n;
+            for (const byte of encoder.encode(name)) {
+                hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * 0x100000001b3n);
+            }
+            return "local.thememaker." + hash.toString(16);
+        }
+
+        async function exportTheme() {
+            const s = validateSettings(settings);
+            const id = themeId(s.name);
+            const rgb = s.background.match(/[0-9a-f]{2}/gi).map(v => parseInt(v, 16));
+            const values = {
+                ...s,
+                id,
+                name: s.name.replace(/\\/g, "\\\\").replace(/"/g, '\\"'),
+                dark: String(rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722 < 140),
+                image: s.material === "flat" ? "none" : `url(theme:${id}/Panel_Texture.png)`
+            };
+            const ovt = OBS_TEMPLATE.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+                if (!(key in values)) throw new Error(`テーマテンプレートの変数が不明です: ${key}`);
+                return String(values[key]);
+            });
+            const pngBlob = await new Promise(resolve => makeTexture(s).toBlob(resolve, "image/png"));
+            if (!pngBlob) throw new Error("テクスチャ画像を作成できませんでした。");
+            const png = new Uint8Array(await pngBlob.arrayBuffer());
+            const instructions = `OBSを閉じ、themesフォルダをOBSの設定フォルダへコピーしてください。\nOBS再起動後、設定 → 外観でテーマYamiを選択し、スタイルから「${s.name}」を選択します。\n元に戻すには元のスタイルを選択してください。\n`;
+            const zip = zipFiles([
+                { name: `themes/${id}.ovt`, data: ovt },
+                { name: `themes/${id}/Panel_Texture.png`, data: png },
+                { name: "導入方法.txt", data: instructions }
+            ]);
+            download(zip, `OBS_Theme_${id.slice(17)}.zip`);
+            get("status").textContent = "テーマZIPを保存しました。解凍してOBSへ導入してください。";
+        }
+
+        // 06. UI events and JSON settings roundtrip.
+        PRESETS.forEach((p, index) => {
+            const option = document.createElement("option");
+            option.value = index;
+            option.textContent = p.preset;
+            get("preset").append(option);
+        });
+        for (const [key, label] of Object.entries(COLOR_LABELS)) {
+            const row = document.createElement("label");
+            row.className = "row";
+            const title = document.createElement("span");
+            title.textContent = label;
+            const value = document.createElement("span");
+            value.id = `${key}Value`;
+            value.className = "color-value";
+            const input = document.createElement("input");
+            input.id = key;
+            input.type = "color";
+            input.setAttribute("aria-label", label);
+            row.append(title, value, input);
+            get("colors").append(row);
+        }
+        for (const key of [...Object.keys(COLOR_LABELS), ...Object.keys(RANGE_LIMITS), "name", "material"]) {
+            get(key).addEventListener("input", () => {
+                settings[key] = key in RANGE_LIMITS ? Number(get(key).value) : get(key).value;
+                renderPreview();
+            });
+        }
+        get("preset").addEventListener("change", () => {
+            applySettings(PRESETS[Number(get("preset").value)]);
+            get("status").textContent = "テンプレートを適用しました。";
+        });
+        get("reset").addEventListener("click", () => {
+            applySettings(PRESETS[Number(get("preset").value)]);
+            get("status").textContent = "選択中のテンプレートに戻しました。";
+        });
+        get("exportTheme").addEventListener("click", async () => {
+            const button = get("exportTheme");
+            button.disabled = true;
+            try {
+                await exportTheme();
+            } catch (error) {
+                get("status").textContent = error.message;
+            } finally {
+                button.disabled = false;
+            }
+        });
+        get("saveSettings").addEventListener("click", () => {
+            try {
+                const data = validateSettings(settings);
+                download(new Blob([JSON.stringify(data, null, 4) + "\n"], { type: "application/json" }), "OBS_Theme_Settings.json");
+                get("status").textContent = "編集設定を保存しました。";
+            } catch (error) {
+                get("status").textContent = error.message;
+            }
+        });
+        get("loadSettings").addEventListener("click", () => get("settingsFile").click());
+        get("settingsFile").addEventListener("change", async event => {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                if (file.size > 65536) throw new Error("設定ファイルが大きすぎます。");
+                applySettings(JSON.parse(await file.text()));
+                const index = PRESETS.findIndex(p => p.preset === settings.preset);
+                if (index >= 0) get("preset").value = index;
+                get("status").textContent = "編集設定を読み込みました。";
+            } catch (error) {
+                get("status").textContent = "読込エラー: " + error.message;
+            }
+            event.target.value = "";
+        });
+        applySettings(PRESETS[0]);
+    </script>
+</body>
+</html>
